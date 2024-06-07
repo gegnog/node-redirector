@@ -12,7 +12,8 @@ const authenticate = (req, res, next) => {
     if (token && token.startsWith('Bearer ')) {
         token = token.split(' ')[1];
         // Perform token validation logic here
-        if (token === process.env.BEARER_TOKEN) {
+        const systemToken = process.env.BEARER_TOKEN || 'olo';
+        if (token === systemToken) {
             next();
         } else {
             res.status(401).send('Invalid bearer token');
@@ -27,23 +28,33 @@ app.get('/', (req, res) => {
 });
 
 app.get('/entries', authenticate, (req, res) => {
+    if (!fs.existsSync('entries.json')) {
+        return res.send('No entries');
+    }
     res.send(JSON.parse(fs.readFileSync('entries.json', 'utf8')));
 });
 
 app.get('/:slug', (req, res) => {
     const { slug } = req.params;
     // Perform logic based on the slug value
-    const entries = JSON.parse(fs.readFileSync('entries.json', 'utf8'));
-    if (entries[slug]) {
-        res.redirect(entries[slug]);
+    if (fs.existsSync('entries.json')) {
+        const entries = JSON.parse(fs.readFileSync('entries.json', 'utf8'));
+        if (entries[slug]) {
+            res.redirect(entries[slug]);
+        } else {
+            res.status(404).send('Not found');
+        }
     } else {
-        res.status(404).send('Not found');
+        res.status(404).send('No entries');
     }
 });
 
 app.post('/entry', authenticate, (req, res) => {
     const { slug, content } = req.body;
     if(!content) return res.status(400).send('Content is required');
+    if(!fs.existsSync('entries.json')) {
+        fs.writeFileSync('entries.json', '{}');
+    }
     const entries = JSON.parse(fs.readFileSync('entries.json', 'utf8'));
     const newSlug = slug || Math.random().toString(36).substring(2, 8);
     entries[newSlug] = content;
